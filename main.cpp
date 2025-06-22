@@ -2,7 +2,11 @@
 #include <filesystem>
 #include <string>
 #include <fstream>
+#include <vector>
+#include <cstdlib>
+#include <zlib.h>
 
+#include "zlib_utils.h"
 
 
 int main(int argc, char *argv[]) {
@@ -79,12 +83,53 @@ int main(int argc, char *argv[]) {
 
 
     }else if (command == "cat-file") {
+
+        if (argc < 4) {
+            std::cerr << "Usage: mgit.exe cat-file -p <hash>";
+            return EXIT_FAILURE;
+        }
+
         std::string flag = argv[2];
         std::string hash = argv[3];
 
+        if (hash.length() != 40) {
+            std::cerr << "invalid hash" << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        if (flag == "-p") {
+            std::string subDir = hash.substr(0,2);
+            std::string file = hash.substr(2);
+            std::string objectPath = ".git" + subDir + file;
+
+            std::ifstream objectFile(objectPath);
+            if (!objectFile.is_open()) {
+                std::cerr << "Failed to open object file: " << objectPath << std::endl;
+                return EXIT_FAILURE;
+            }
+
+            std::vector<char> compressedData(
+                (std::istreambuf_iterator<char>(objectFile)),
+                    std::istreambuf_iterator<char>()
+            );
+            objectFile.close();
+
+            std::vector<char> decompressedData = zlib_utils::decompress_zlib(compressedData);
+
+            if (!decompressedData.empty()) {
+                std::cout.write(decompressedData.data(), decompressedData.size());
+                std::cout << std::endl;
+            }else {
+                std::cerr << "Failed to decompress object data.\n";
+                return EXIT_FAILURE;
+            }
+
+        }else {
+            std::cerr << "invalid flag" << std::endl;
+        }
 
 
-    }else {
+    } else {
         std::cerr << "Unknown command" << std::endl;
         return EXIT_FAILURE;
     }
